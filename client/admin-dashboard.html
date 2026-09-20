@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital Ajo - Admin Dashboard</title>
+    <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+
+    <!-- Main Navigation Header -->
+    <header class="navbar">
+        <div class="nav-brand">
+            <h2>Digital Ajo</h2>
+            <span class="badge">Admin Portal</span>
+        </div>
+        <div class="nav-user">
+            <span id="adminName">System Administrator</span>
+            <button id="logoutBtn" class="btn-logout">Logout</button>
+        </div>
+    </header>
+
+    <main class="dashboard-container">
+
+        <!-- Top Overview Stats -->
+        <section class="stats-grid">
+            <div class="stat-card">
+                <h4>Total Registered Clients</h4>
+                <p id="totalClientsCount">0</p>
+            </div>
+            <div class="stat-card">
+                <h4>Today's Collections</h4>
+                <p id="todayCollectionsTotal">₦0</p>
+            </div>
+            <div class="stat-card">
+                <h4>Total Active Loans</h4>
+                <p id="activeLoansTotal">₦0</p>
+            </div>
+            <div class="stat-card">
+                <h4>Pending Reversals / Alerts</h4>
+                <p id="pendingAlertsCount">0</p>
+            </div>
+        </section>
+
+        <div class="dashboard-content">
+
+            <!-- Left Panel: Actions & Client Registration -->
+            <section class="panel-section">
+                
+                <!-- Client Registration Form -->
+                <div class="card">
+                    <h3>Register New Client</h3>
+                    <form id="registerClientForm">
+                        <div class="form-group">
+                            <label for="clientName">Full Name</label>
+                            <input type="text" id="clientName" placeholder="e.g. Chukwuma Adebayo" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="clientPhone">Phone Number</label>
+                            <input type="tel" id="clientPhone" placeholder="e.g. 08012345678" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dailySavingsGoal">Daily Savings Goal (₦)</label>
+                            <input type="number" id="dailySavingsGoal" placeholder="1000" min="100" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="defaultPassword">Default Password/PIN</label>
+                            <input type="password" id="defaultPassword" placeholder="Minimum 4 characters" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="startDate">Start Date</label>
+                            <input type="date" id="startDate" required>
+                        </div>
+
+                        <button type="submit" class="btn-primary">Register Client</button>
+                        <p id="registerMessage" class="form-message"></p>
+                    </form>
+                </div>
+
+                <!-- Issue Loan Section -->
+                <div class="card margin-top">
+                    <h3>Issue Micro-Loan</h3>
+                    <form id="issueLoanForm">
+                        <div class="form-group">
+                            <label for="loanClientId">Select Client</label>
+                            <select id="loanClientId" required>
+                                <option value="">-- Choose Client --</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="loanAmount">Loan Amount (₦)</label>
+                            <input type="number" id="loanAmount" placeholder="50000" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="interestRate">Interest Rate (%)</label>
+                            <input type="number" id="interestRate" placeholder="10" step="0.1" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="tenureDays">Repayment Tenure (Days)</label>
+                            <input type="number" id="tenureDays" placeholder="30" required>
+                        </div>
+
+                        <div class="form-summary">
+                            <p>Total Payable: <strong id="calculatedTotalPayable">₦0</strong></p>
+                            <p>Daily Installment: <strong id="calculatedDailyRepayment">₦0</strong></p>
+                        </div>
+
+                        <button type="submit" class="btn-primary">Disburse Loan</button>
+                        <p id="loanMessage" class="form-message"></p>
+                    </form>
+                </div>
+
+            </section>
+
+            <!-- Right Panel: Trackers & Tables -->
+            <section class="panel-section double-width">
+
+                <!-- Daily Collections Tracker -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Daily Collection Tracker</h3>
+                        <span class="date-indicator" id="currentDateDisplay"></span>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Client Name</th>
+                                    <th>Target (₦)</th>
+                                    <th>Status Today</th>
+                                    <th>Last Payment</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="collectionTrackerBody">
+                                <!-- Dynamic rows via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Recent Transactions & Audit/Reversal Log -->
+                <div class="card margin-top">
+                    <h3>Recent Transactions & Reversals</h3>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Tx ID</th>
+                                    <th>Client</th>
+                                    <th>Type</th>
+                                    <th>Amount (₦)</th>
+                                    <th>Time</th>
+                                    <th>Status</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactionsLogBody">
+                                <!-- Dynamic rows via JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </section>
+
+        </div>
+
+    </main>
+
+    <script src="js/admin.js"></script>
+</body>
+</html>
