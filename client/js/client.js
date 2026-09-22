@@ -1,39 +1,3 @@
-// Mock client state (Simulates the authenticated client session)
-const currentClient = {
-    id: 1,
-    name: 'Chukwuma Adebayo',
-    phone: '08012345678',
-    dailyGoal: 1000,
-    paidToday: true,
-    totalSavings: 15000,
-    activeLoanBalance: 0
-};
-
-// Personal payment history mock
-let clientTransactions = [
-    {
-        id: 'TX1001',
-        type: 'Savings Deposit',
-        amount: 1000,
-        timestamp: '2026-09-18 14:30',
-        status: 'Completed'
-    },
-    {
-        id: 'TX0998',
-        type: 'Savings Deposit',
-        amount: 1000,
-        timestamp: '2026-09-17 10:15',
-        status: 'Completed'
-    },
-    {
-        id: 'TX0985',
-        type: 'Savings Deposit',
-        amount: 1000,
-        timestamp: '2026-09-16 16:00',
-        status: 'Completed'
-    }
-];
-
 // DOM Elements
 const clientNameDisplay = document.getElementById('clientNameDisplay');
 const savingsBalance = document.getElementById('savingsBalance');
@@ -49,77 +13,147 @@ const loanApplyForm = document.getElementById('loanApplyForm');
 const loanApplyMessage = document.getElementById('loanApplyMessage');
 const logoutBtn = document.getElementById('logoutBtn');
 
+// Base API URL
+const API_BASE_URL = 'https://digital-ab8v.onrender.com/api';
+
 // Initialize Client Dashboard UI
 document.addEventListener('DOMContentLoaded', () => {
-    renderClientProfile();
-    renderHistoryTable();
+    fetchClientProfile();
+    fetchHistoryTable();
 });
 
-// 1. Render Dashboard Metrics
-function renderClientProfile() {
-    clientNameDisplay.textContent = currentClient.name;
-    savingsBalance.textContent = `₦${currentClient.totalSavings.toLocaleString()}`;
-    activeLoanBalance.textContent = `₦${currentClient.activeLoanBalance.toLocaleString()}`;
-    dailyTarget.textContent = `₦${currentClient.dailyGoal.toLocaleString()}`;
+// 1. Fetch & Render Dashboard Metrics
+async function fetchClientProfile() {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/client/profile`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
-    if (currentClient.paidToday) {
-        todayStatus.innerHTML = `<span class="status-badge status-paid">PAID TODAY</span>`;
-    } else {
-        todayStatus.innerHTML = `<span class="status-badge status-unpaid">UNPAID</span>`;
+        if (!response.ok) throw new Error('Failed to fetch profile');
+
+        const client = await response.json();
+
+        clientNameDisplay.textContent = client.name || 'Client';
+        savingsBalance.textContent = `₦${(client.totalSavings || 0).toLocaleString()}`;
+        activeLoanBalance.textContent = `₦${(client.activeLoanBalance || 0).toLocaleString()}`;
+        dailyTarget.textContent = `₦${(client.dailyGoal || 0).toLocaleString()}`;
+
+        if (client.paidToday) {
+            todayStatus.innerHTML = `<span class="status-badge status-paid">PAID TODAY</span>`;
+        } else {
+            todayStatus.innerHTML = `<span class="status-badge status-unpaid">UNPAID</span>`;
+        }
+    } catch (error) {
+        console.error('Profile load error:', error);
     }
 }
 
-// 2. Render Personal Transaction History Table
-function renderHistoryTable() {
-    clientHistoryBody.innerHTML = '';
+// 2. Fetch & Render Personal Transaction History Table
+async function fetchHistoryTable() {
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/client/transactions`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
 
-    clientTransactions.forEach(tx => {
-        const row = document.createElement('tr');
-        const isReversed = tx.status === 'Reversed';
-        const statusClass = isReversed ? 'status-unpaid' : 'status-paid';
+        if (!response.ok) throw new Error('Failed to fetch transactions');
 
-        row.innerHTML = `
-            <td><small>${tx.timestamp}</small></td>
-            <td>${tx.type}</td>
-            <td>₦${tx.amount.toLocaleString()}</td>
-            <td><span class="status-badge ${statusClass}">${tx.status}</span></td>
-        `;
+        const transactions = await response.json();
+        clientHistoryBody.innerHTML = '';
 
-        clientHistoryBody.appendChild(row);
-    });
+        transactions.forEach(tx => {
+            const row = document.createElement('tr');
+            const isReversed = tx.status === 'Reversed';
+            const statusClass = isReversed ? 'status-unpaid' : 'status-paid';
+
+            row.innerHTML = `
+                <td><small>${tx.timestamp}</small></td>
+                <td>${tx.type}</td>
+                <td>₦${tx.amount.toLocaleString()}</td>
+                <td><span class="status-badge ${statusClass}">${tx.status}</span></td>
+            `;
+
+            clientHistoryBody.appendChild(row);
+        });
+    } catch (error) {
+        console.error('History load error:', error);
+    }
 }
 
 // 3. Handle Withdrawal Request
-withdrawalForm.addEventListener('submit', (e) => {
+withdrawalForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const amount = parseFloat(document.getElementById('withdrawalAmount').value);
     const reason = document.getElementById('withdrawalReason').value.trim();
 
-    if (amount > currentClient.totalSavings) {
-        showMessage(withdrawalMessage, 'Insufficient savings balance for this request.', 'error');
-        return;
-    }
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/withdrawals/request`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ amount, reason })
+        });
 
-    // In full implementation, this sends a POST request to Express (/api/withdrawals/request)
-    showMessage(withdrawalMessage, 'Withdrawal request submitted successfully! Pending admin approval.', 'success');
-    withdrawalForm.reset();
+        const data = await response.json();
+
+        if (!response.ok) {
+            showMessage(withdrawalMessage, data.message || 'Withdrawal request failed.', 'error');
+            return;
+        }
+
+        showMessage(withdrawalMessage, 'Withdrawal request submitted successfully! Pending admin approval.', 'success');
+        withdrawalForm.reset();
+        fetchClientProfile();
+    } catch (error) {
+        showMessage(withdrawalMessage, 'Network error. Please try again.', 'error');
+    }
 });
 
 // 4. Handle Loan Application
-loanApplyForm.addEventListener('submit', (e) => {
+loanApplyForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const amount = parseFloat(document.getElementById('applyLoanAmount').value);
     const tenure = parseInt(document.getElementById('applyTenure').value);
 
-    // In full implementation, this sends a POST request to Express (/api/loans/apply)
-    showMessage(loanApplyMessage, `Loan application for ₦${amount.toLocaleString()} over ${tenure} days submitted!`, 'success');
-    loanApplyForm.reset();
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/loans/apply`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ amount, tenure })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            showMessage(loanApplyMessage, data.message || 'Loan application failed.', 'error');
+            return;
+        }
+
+        showMessage(loanApplyMessage, `Loan application for ₦${amount.toLocaleString()} over ${tenure} days submitted!`, 'success');
+        loanApplyForm.reset();
+        fetchClientProfile();
+    } catch (error) {
+        showMessage(loanApplyMessage, 'Network error. Please try again.', 'error');
+    }
 });
 
 // 5. Handle Logout
 logoutBtn.addEventListener('click', () => {
+    localStorage.removeItem('token');
     localStorage.removeItem('userRole');
     window.location.href = 'index.html';
 });
