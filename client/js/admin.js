@@ -1,7 +1,3 @@
-// State Management (Empty initial state for production/hand-off)
-let clients = [];
-let transactions = [];
-
 // DOM Elements
 const registerClientForm = document.getElementById('registerClientForm');
 const registerMessage = document.getElementById('registerMessage');
@@ -24,10 +20,17 @@ const loanMessage = document.getElementById('loanMessage');
 const totalClientsCount = document.getElementById('totalClientsCount');
 const todayCollectionsTotal = document.getElementById('todayCollectionsTotal');
 
+// Base API URL
+const API_BASE_URL = 'https://digital-ab8v.onrender.com/api';
+
+// State Management
+let clients = [];
+let transactions = [];
+
 // Initialize Admin Dashboard UI
 document.addEventListener('DOMContentLoaded', () => {
     setCurrentDate();
-    renderDashboard();
+    fetchDashboardData();
     setupLoanCalculations();
     setupLogout();
 });
@@ -36,6 +39,29 @@ document.addEventListener('DOMContentLoaded', () => {
 function setCurrentDate() {
     const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
     currentDateDisplay.textContent = new Date().toLocaleDateString('en-NG', options);
+}
+
+// Fetch All Dashboard Data from Live API
+async function fetchDashboardData() {
+    const token = localStorage.getItem('token');
+    
+    try {
+        const [clientsRes, txRes] = await Promise.all([
+            fetch(`${API_BASE_URL}/admin/clients`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            }),
+            fetch(`${API_BASE_URL}/admin/transactions`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+        ]);
+
+        if (clientsRes.ok) clients = await clientsRes.json();
+        if (txRes.ok) transactions = await txRes.json();
+
+        renderDashboard();
+    } catch (error) {
+        console.error('Error fetching admin dashboard data:', error);
+    }
 }
 
 // Main Render Function
@@ -52,7 +78,7 @@ function renderStats() {
     
     const todayTotal = transactions
         .filter(t => t.status === 'Completed' && t.type === 'Savings Deposit')
-        .reduce((sum, t) => sum + t.amount, 0);
+        .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
 
     todayCollectionsTotal.textContent = `₦${todayTotal.toLocaleString()}`;
 }
@@ -80,9 +106,9 @@ function renderCollectionTracker() {
 
         row.innerHTML = `
             <td><strong>${client.name}</strong><br><small>${client.phone}</small></td>
-            <td>₦${client.dailyGoal.toLocaleString()}</td>
+            <td>₦${(client.dailyGoal || 0).toLocaleString()}</td>
             <td><span class="status-badge ${statusClass}">${statusText}</span></td>
-            <td>${client.lastPaymentDate}</td>
+            <td>${client.lastPaymentDate || 'No payments yet'}</td>
             <td>
                 ${client.paidToday 
                     ? `<span style="color: #2d6a4f; font-weight: 600;">✓ Recorded</span>`
@@ -120,7 +146,7 @@ function renderTransactions() {
             <td><code>${tx.id}</code></td>
             <td>${tx.clientName}</td>
             <td>${tx.type}</td>
-            <td>₦${tx.amount.toLocaleString()}</td>
+            <td>₦${(parseFloat(tx.amount) || 0).toLocaleString()}</td>
             <td><small>${tx.timestamp}</small></td>
             <td><span class="status-badge ${statusClass}">${tx.status}</span></td>
             <td>
@@ -136,7 +162,7 @@ function renderTransactions() {
 }
 
 // 4. Register New Client
-registerClientForm.addEventListener('submit', (e) => {
+registerClientForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const name = document.getElementById('clientName').value.trim();
@@ -144,73 +170,95 @@ registerClientForm.addEventListener('submit', (e) => {
     const dailyGoal = parseFloat(document.getElementById('dailySavingsGoal').value);
     const startDate = document.getElementById('startDate').value;
 
-    const newClient = {
-        id: clients.length + 1,
-        name,
-        phone,
-        dailyGoal,
-        paidToday: false,
-        lastPaymentDate: 'No payments yet',
-        totalSavings: 0,
-        startDate
-    };
+    try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/admin/register-client`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ name, phone, dailyGoal, startDate })
+        });
 
-    clients.push(newClient);
-    registerMessage.textContent = 'Client registered successfully!';
-    registerMessage.style.color = '#2d6a4f';
+        const data = await response.json();
 
-    registerClientForm.reset();
-    renderDashboard();
+        if (!response.ok) {
+            registerMessage.textContent = data.message || 'Error registering client.';
+            registerMessage.style.color = '#d90429';
+            return;
+        }
 
-    setTimeout(() => { registerMessage.textContent = ''; }, 3000);
+        registerMessage.textContent = 'Client registered successfully!';
+        registerMessage.style.color = '#2d6a4f';
+
+        registerClientForm.reset();
+        fetchDashboardData();
+
+        setTimeout(() => { registerMessage.textContent = ''; }, 3000);
+    } catch (error) {
+        registerMessage.textContent = 'Network error. Please try again.';
+        registerMessage.style.color = '#d90429';
+    }
 });
 
 // 5. Two-Step Payment Confirmation
-function confirmPayment(clientId) {
+async function confirmPayment(clientId) {
     const client = clients.find(c => c.id === clientId);
     if (!client) return;
 
     const confirmed = confirm(`Confirm payment of ₦${client.dailyGoal.toLocaleString()} for ${client.name}?`);
     
     if (confirmed) {
-        const timestamp = new Date().toLocaleString('sv-SE').replace('T', ' ');
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${API_BASE_URL}/admin/record-payment`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ clientId: client.id, amount: client.dailyGoal })
+            });
 
-        client.paidToday = true;
-        client.lastPaymentDate = timestamp;
-        client.totalSavings += client.dailyGoal;
-
-        const newTx = {
-            id: `TX${1000 + transactions.length + 1}`,
-            clientId: client.id,
-            clientName: client.name,
-            type: 'Savings Deposit',
-            amount: client.dailyGoal,
-            timestamp: timestamp,
-            status: 'Completed'
-        };
-
-        transactions.unshift(newTx);
-        renderDashboard();
+            if (response.ok) {
+                fetchDashboardData();
+            } else {
+                alert('Failed to log payment on server.');
+            }
+        } catch (error) {
+            alert('Network error while recording payment.');
+        }
     }
 }
 
-// 6. Transaction Reversal Functionality (Audit Integrity)
-function triggerReversal(txId) {
+// 6. Transaction Reversal Functionality
+async function triggerReversal(txId) {
     const tx = transactions.find(t => t.id === txId);
     if (!tx || tx.status === 'Reversed') return;
 
     const confirmed = confirm(`Are you sure you want to REVERSE transaction ${txId}? This action cannot be undone.`);
 
     if (confirmed) {
-        tx.status = 'Reversed';
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${API_BASE_URL}/admin/reverse-transaction`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ transactionId: txId })
+            });
 
-        const client = clients.find(c => c.id === tx.clientId);
-        if (client) {
-            client.totalSavings -= tx.amount;
-            client.paidToday = false;
+            if (response.ok) {
+                fetchDashboardData();
+            } else {
+                alert('Failed to reverse transaction on server.');
+            }
+        } catch (error) {
+            alert('Network error while reversing transaction.');
         }
-
-        renderDashboard();
     }
 }
 
