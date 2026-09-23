@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// GET clients under /admin/clients endpoint
+// GET clients fallback path
 router.get('/clients', async (req, res) => {
     try {
         const result = await pool.query('SELECT * FROM clients ORDER BY id DESC');
@@ -32,9 +32,10 @@ router.post('/register-client', async (req, res) => {
         const clientPin = pin || password || '1234';
         const goal = dailyGoal || 0;
 
+        // Dynamic check or direct safe insert
         const newClient = await pool.query(
-            `INSERT INTO clients (name, phone, daily_goal, start_date, pin, created_at) 
-             VALUES ($1, $2, $3, $4, $5, NOW()) RETURNING *`,
+            `INSERT INTO clients (name, phone, daily_goal, start_date, pin) 
+             VALUES ($1, $2, $3, $4, $5) RETURNING *`,
             [name, phone, goal, startDate || new Date(), clientPin]
         );
 
@@ -43,8 +44,11 @@ router.post('/register-client', async (req, res) => {
             client: newClient.rows[0]
         });
     } catch (error) {
-        console.error('Error registering client:', error);
-        res.status(500).json({ message: 'Database error registering client.' });
+        console.error('❌ Detailed Database Registration Error:', error);
+        res.status(500).json({ 
+            message: 'Database error registering client.',
+            detail: error.message 
+        });
     }
 });
 
