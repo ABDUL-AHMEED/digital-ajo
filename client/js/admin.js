@@ -74,17 +74,18 @@ function renderDashboard() {
 
 // 1. Render Summary Statistics
 function renderStats() {
-    totalClientsCount.textContent = clients.length;
+    if (totalClientsCount) totalClientsCount.textContent = clients.length;
     
     const todayTotal = transactions
         .filter(t => t.status === 'Completed' && t.type === 'Savings Deposit')
         .reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
 
-    todayCollectionsTotal.textContent = `₦${todayTotal.toLocaleString()}`;
+    if (todayCollectionsTotal) todayCollectionsTotal.textContent = `₦${todayTotal.toLocaleString()}`;
 }
 
 // 2. Render Daily Collection Tracker Table
 function renderCollectionTracker() {
+    if (!collectionTrackerBody) return;
     collectionTrackerBody.innerHTML = '';
 
     if (clients.length === 0) {
@@ -123,6 +124,7 @@ function renderCollectionTracker() {
 
 // 3. Render Transactions and Reversals Table
 function renderTransactions() {
+    if (!transactionsLogBody) return;
     transactionsLogBody.innerHTML = '';
 
     if (transactions.length === 0) {
@@ -169,6 +171,10 @@ registerClientForm.addEventListener('submit', async (e) => {
     const phone = document.getElementById('clientPhone').value.trim();
     const dailyGoal = parseFloat(document.getElementById('dailySavingsGoal').value);
     const startDate = document.getElementById('startDate').value;
+    
+    // Safely capture PIN/Password input
+    const pinInput = document.getElementById('clientPin') || document.getElementById('clientPassword');
+    const pin = pinInput ? pinInput.value.trim() : '1234';
 
     try {
         const token = localStorage.getItem('token');
@@ -178,7 +184,14 @@ registerClientForm.addEventListener('submit', async (e) => {
                 'Content-Type': 'application/json',
                 'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ name, phone, dailyGoal, startDate })
+            body: JSON.stringify({ 
+                name, 
+                phone, 
+                dailyGoal, 
+                startDate,
+                pin,
+                password: pin 
+            })
         });
 
         const data = await response.json();
@@ -197,6 +210,7 @@ registerClientForm.addEventListener('submit', async (e) => {
 
         setTimeout(() => { registerMessage.textContent = ''; }, 3000);
     } catch (error) {
+        console.error('Registration error details:', error);
         registerMessage.textContent = 'Network error. Please try again.';
         registerMessage.style.color = '#d90429';
     }
@@ -264,6 +278,8 @@ async function triggerReversal(txId) {
 
 // 7. Dynamic Loan Repayment Calculations
 function setupLoanCalculations() {
+    if (!loanAmountInput || !interestRateInput || !tenureDaysInput) return;
+
     const calculate = () => {
         const principal = parseFloat(loanAmountInput.value) || 0;
         const rate = parseFloat(interestRateInput.value) || 0;
@@ -273,8 +289,8 @@ function setupLoanCalculations() {
         const totalPayable = principal + totalInterest;
         const dailyInstallment = totalPayable / tenure;
 
-        calculatedTotalPayable.textContent = `₦${totalPayable.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
-        calculatedDailyRepayment.textContent = `₦${dailyInstallment.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+        if (calculatedTotalPayable) calculatedTotalPayable.textContent = `₦${totalPayable.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+        if (calculatedDailyRepayment) calculatedDailyRepayment.textContent = `₦${dailyInstallment.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
     };
 
     loanAmountInput.addEventListener('input', calculate);
@@ -284,6 +300,7 @@ function setupLoanCalculations() {
 
 // Populate Client Select Dropdown for Loans
 function populateClientDropdown() {
+    if (!loanClientId) return;
     loanClientId.innerHTML = '<option value="">-- Choose Client --</option>';
     clients.forEach(c => {
         const option = document.createElement('option');
@@ -302,4 +319,13 @@ function setupLogout() {
             window.location.href = 'index.html';
         });
     }
+}
+
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('Service Worker registered successfully:', reg))
+      .catch(err => console.log('Service Worker registration failed:', err));
+  });
 }
