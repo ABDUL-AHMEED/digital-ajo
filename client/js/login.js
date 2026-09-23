@@ -67,3 +67,12 @@ function showMessage(message, type) {
     loginMessage.textContent = message;
     loginMessage.className = type === 'error' ? 'form-message error-message' : 'form-message success-message';
 }
+
+// Register Service Worker for PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('Service Worker registered successfully:', reg))
+      .catch(err => console.log('Service Worker registration failed:', err));
+  });
+}
