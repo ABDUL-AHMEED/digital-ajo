@@ -20,13 +20,22 @@ router.post('/login', async (req, res) => {
         }
 
         const user = userResult.rows[0];
-        const isMatch = await bcrypt.compare(password, user.password_hash);
+        
+        // Get password column regardless of column naming in DB
+        const storedPassword = user.password_hash || user.password;
+
+        // Check bcrypt hash first, or fall back to plain-text string match
+        let isMatch = false;
+        if (storedPassword && storedPassword.startsWith('$2')) {
+            isMatch = await bcrypt.compare(password, storedPassword);
+        } else {
+            isMatch = (password === storedPassword);
+        }
 
         if (!isMatch) {
             return res.status(400).json({ message: 'Invalid phone number or password.' });
         }
 
-        // Guarantees JWT signing never crashes if .env key is missing
         const secret = process.env.JWT_SECRET || 'digital_ajo_fallback_secret_key_2026';
 
         const token = jwt.sign(
@@ -42,7 +51,7 @@ router.post('/login', async (req, res) => {
                 id: user.id,
                 phone: user.phone,
                 role: user.role,
-                full_name: user.full_name
+                full_name: user.full_name || user.name
             }
         });
 
