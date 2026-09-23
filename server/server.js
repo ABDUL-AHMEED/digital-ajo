@@ -3,15 +3,20 @@ const cors = require("cors");
 require("dotenv").config();
 
 const pool = require("./db/database");
+
+// -----------------------------
+// IMPORT ALL ROUTE MODULES
+// -----------------------------
 const authRoutes = require("./routes/auth");
+const clientRoutes = require("./routes/clients");
+const loanRoutes = require("./routes/loans");
+const paymentRoutes = require("./routes/payments");
 
 const app = express();
 
 // -----------------------------
 // MIDDLEWARE
 // -----------------------------
-
-// Explicit CORS config to allow frontend requests from any origin/file
 app.use(cors({
     origin: '*',
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -23,22 +28,25 @@ app.use(express.json());
 // -----------------------------
 // API ROUTES
 // -----------------------------
-
 app.use("/api/auth", authRoutes);
+app.use("/api/clients", clientRoutes);
+app.use("/api/loans", loanRoutes);
+app.use("/api/payments", paymentRoutes);
+
+// Fallback mounts so requests sent to /api/admin match your route controllers
+app.use("/api/admin/clients", clientRoutes);
+app.use("/api/admin/register-client", clientRoutes);
+app.use("/api/admin", clientRoutes);
+app.use("/api/admin", paymentRoutes);
 
 // -----------------------------
-// BASIC ROUTE
+// BASIC & HEALTH CHECK ROUTES
 // -----------------------------
-
 app.get("/", (req, res) => {
     res.json({
         message: "Digital Ajo API is running 🚀"
     });
 });
-
-// -----------------------------
-// DATABASE HEALTH CHECK
-// -----------------------------
 
 app.get("/api/health/db", async (req, res) => {
     try {
@@ -63,7 +71,6 @@ app.get("/api/health/db", async (req, res) => {
 // -----------------------------
 // SERVER INITIALIZATION
 // -----------------------------
-
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, async () => {
