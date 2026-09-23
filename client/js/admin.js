@@ -21,7 +21,7 @@ const totalClientsCount = document.getElementById('totalClientsCount');
 const todayCollectionsTotal = document.getElementById('todayCollectionsTotal');
 
 // Base API URL
-const API_BASE_URL = 'https://digital-ab8v.onrender.com/api';
+const API_BASE_URL = 'https://digital-ajo-1lhw.onrender.com/api';
 
 // State Management
 let clients = [];

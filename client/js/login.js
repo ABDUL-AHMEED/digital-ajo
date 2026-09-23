@@ -6,7 +6,7 @@ const loginButton = document.getElementById('loginButton');
 const loginMessage = document.getElementById('loginMessage');
 
 // Live Render API Base URL
-const API_BASE_URL = 'https://digital-ab8v.onrender.com/api';
+const API_BASE_URL = 'https://digital-ajo-1lhw.onrender.com/api';
 
 // Handle Login Submission
 loginForm.addEventListener('submit', async (e) => {

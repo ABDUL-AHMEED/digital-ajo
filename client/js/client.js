@@ -14,7 +14,7 @@ const loanApplyMessage = document.getElementById('loanApplyMessage');
 const logoutBtn = document.getElementById('logoutBtn');
 
 // Base API URL
-const API_BASE_URL = 'https://digital-ab8v.onrender.com/api';
+const API_BASE_URL = 'https://digital-ajo-1lhw.onrender.com/api';
 
 // Initialize Client Dashboard UI
 document.addEventListener('DOMContentLoaded', () => {
