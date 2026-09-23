@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const bcrypt = require('bcryptjs');
 const pool = require('../db/database');
 
 // GET all clients
@@ -13,18 +14,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// GET clients fallback path
-router.get('/clients', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM clients ORDER BY id DESC');
-        res.json(result.rows);
-    } catch (error) {
-        console.error('Error fetching clients:', error);
-        res.status(500).json({ message: 'Server error fetching clients.' });
-    }
-});
-
-// POST register new client
+// POST register new client (Creates BOTH client profile and login user)
 router.post('/register-client', async (req, res) => {
     const { name, phone, dailyGoal, startDate, pin, password } = req.body;
 
@@ -32,18 +22,23 @@ router.post('/register-client', async (req, res) => {
         const clientPassword = password || pin || '1234';
         const goal = dailyGoal || 0;
 
-        // 1. Create User Authentication Profile
+        // Hash the password for secure storage
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(clientPassword, salt);
+
+        // 1. Create or update user login credentials
         const newUser = await pool.query(
-            `INSERT INTO users (full_name, phone, password, role) 
-             VALUES ($1, $2, $3, 'client') 
-             ON CONFLICT (phone) DO UPDATE SET password = EXCLUDED.password
+            `INSERT INTO users (full_name, phone, password, password_hash, role) 
+             VALUES ($1, $2, $3, $4, 'client') 
+             ON CONFLICT (phone) DO UPDATE 
+             SET password = EXCLUDED.password, password_hash = EXCLUDED.password_hash
              RETURNING id`,
-            [name, phone, clientPassword]
+            [name, phone, clientPassword, hashedPassword]
         );
 
         const userId = newUser.rows[0].id;
 
-        // 2. Create Client Record Linked to User ID
+        // 2. Create client profile linked to user account
         const newClient = await pool.query(
             `INSERT INTO clients (user_id, name, phone, daily_goal, start_date, pin) 
              VALUES ($1, $2, $3, $4, $5, $6) 
@@ -57,11 +52,8 @@ router.post('/register-client', async (req, res) => {
             client: newClient.rows[0]
         });
     } catch (error) {
-        console.error('❌ Detailed Database Registration Error:', error);
-        res.status(500).json({ 
-            message: 'Database error registering client.',
-            detail: error.message 
-        });
+        console.error('❌ Registration Error:', error);
+        res.status(500).json({ message: 'Database error registering client.', detail: error.message });
     }
 });
 
