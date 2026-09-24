@@ -2,59 +2,40 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db/database');
 
-// GET transactions
-router.get('/transactions', async (req, res) => {
-    try {
-        const result = await pool.query('SELECT * FROM transactions ORDER BY id DESC');
-        res.json(result.rows);
-    } catch (error) {
-        console.error('Error fetching transactions:', error);
-        res.status(500).json({ message: 'Server error fetching transactions.' });
-    }
-});
-
-// POST record payment
-router.post('/record-payment', async (req, res) => {
-    const { clientId, amount } = req.body;
+// POST /api/payments (Log Today's Savings Payment)
+router.post('/', async (req, res) => {
+    const { clientId, amount, recordedBy } = req.body;
 
     try {
-        const clientQuery = await pool.query('SELECT * FROM clients WHERE id = $1', [clientId]);
-        if (clientQuery.rows.length === 0) {
-            return res.status(404).json({ message: 'Client not found.' });
+        const paymentAmount = parseFloat(amount) || 0;
+
+        if (!clientId || paymentAmount <= 0) {
+            return res.status(400).json({ message: 'Valid client ID and payment amount are required.' });
         }
 
-        const clientName = clientQuery.rows[0].name;
+        // 1. Insert Payment Record
+        const newPayment = await pool.query(
+            `INSERT INTO payments (client_id, amount, recorded_by, status) 
+             VALUES ($1, $2, $3, 'completed') RETURNING *`,
+            [clientId, paymentAmount, recordedBy || null]
+        );
 
-        const newTx = await pool.query(
-            `INSERT INTO transactions (client_id, client_name, type, amount, status, timestamp) 
-             VALUES ($1, $2, 'Savings Deposit', $3, 'Completed', NOW()) RETURNING *`,
-            [clientId, clientName, amount]
+        // 2. Update Client's Total Savings Balance
+        await pool.query(
+            `UPDATE clients 
+             SET savings_balance = COALESCE(savings_balance, 0) + $1 
+             WHERE id = $2`,
+            [paymentAmount, clientId]
         );
 
         res.status(201).json({
-            message: 'Payment recorded successfully!',
-            transaction: newTx.rows[0]
+            message: 'Payment logged successfully!',
+            payment: newPayment.rows[0]
         });
+
     } catch (error) {
-        console.error('Error recording payment:', error);
-        res.status(500).json({ message: 'Database error recording payment.' });
-    }
-});
-
-// POST reverse transaction
-router.post('/reverse-transaction', async (req, res) => {
-    const { transactionId } = req.body;
-
-    try {
-        await pool.query(
-            `UPDATE transactions SET status = 'Reversed' WHERE id = $1`,
-            [transactionId]
-        );
-
-        res.json({ message: 'Transaction reversed successfully!' });
-    } catch (error) {
-        console.error('Error reversing transaction:', error);
-        res.status(500).json({ message: 'Database error reversing transaction.' });
+        console.error('❌ Payment Logging Error:', error);
+        res.status(500).json({ message: 'Error logging payment.', detail: error.message });
     }
 });
 

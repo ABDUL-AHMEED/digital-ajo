@@ -14,36 +14,36 @@ router.get('/', async (req, res) => {
     }
 });
 
-// POST register new client (Creates BOTH client profile and login user)
+// POST register new client
 router.post('/register-client', async (req, res) => {
     const { name, phone, dailyGoal, startDate, pin, password } = req.body;
 
     try {
         const clientPassword = password || pin || '1234';
-        const goal = dailyGoal || 0;
+        const goal = parseFloat(dailyGoal) || 0;
 
-        // Hash the password for secure storage
+        // Check if phone number is already registered
+        const existingUser = await pool.query('SELECT * FROM users WHERE phone = $1', [phone]);
+        if (existingUser.rows.length > 0) {
+            return res.status(400).json({ message: 'A client with this phone number already exists.' });
+        }
+
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(clientPassword, salt);
 
-        // 1. Create or update user login credentials
+        // 1. Insert User
         const newUser = await pool.query(
             `INSERT INTO users (full_name, phone, password, password_hash, role) 
-             VALUES ($1, $2, $3, $4, 'client') 
-             ON CONFLICT (phone) DO UPDATE 
-             SET password = EXCLUDED.password, password_hash = EXCLUDED.password_hash
-             RETURNING id`,
+             VALUES ($1, $2, $3, $4, 'client') RETURNING id`,
             [name, phone, clientPassword, hashedPassword]
         );
 
         const userId = newUser.rows[0].id;
 
-        // 2. Create client profile linked to user account
+        // 2. Insert Client Profile
         const newClient = await pool.query(
             `INSERT INTO clients (user_id, name, phone, daily_goal, start_date, pin) 
-             VALUES ($1, $2, $3, $4, $5, $6) 
-             ON CONFLICT (phone) DO UPDATE SET daily_goal = EXCLUDED.daily_goal
-             RETURNING *`,
+             VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
             [userId, name, phone, goal, startDate || new Date(), clientPassword]
         );
 
